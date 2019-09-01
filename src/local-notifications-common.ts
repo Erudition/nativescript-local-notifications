@@ -83,6 +83,12 @@ export interface ScheduleOptions {
    */
   sound?: string;
 
+
+  /**
+   * On Android, you can customize the vibration pattern, for notifications that should be easily distinguishable from others without needing to see or hear it. Different patterns can convey different senses of urgency, so only customize this if you think it's what the user would want. Takes a list of integers for the timing of the vibrator: milliseconds on, milliseconds off. Milliseconds on, milliseconds off. and so on.
+   */
+  vibratePattern?: Array<number>;
+
   /**
    * Custom color for the notification icon and title that will be applied when the notification center is expanded.
    * Android >= Lollipop (21) only.
@@ -177,6 +183,11 @@ export interface ScheduleOptions {
    * Default false.
    */
   forceShowWhenInForeground?: boolean;
+
+  /**
+   * Default false.
+   */
+  priority?: number;
 
   /**
    * Buttons or text input.

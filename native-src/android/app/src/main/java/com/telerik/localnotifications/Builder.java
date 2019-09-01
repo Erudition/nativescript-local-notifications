@@ -58,18 +58,20 @@ public final class Builder {
 
         NotificationCompat.Builder builder = android.os.Build.VERSION.SDK_INT >= 26 ? new NotificationCompat.Builder(context, channelID) : new NotificationCompat.Builder(context);
 
+
+
         builder
             .setDefaults(0)
             .setContentTitle(options.optString("title", null))
             .setSubText(options.optString("subtitle", null))
             .setContentText(options.optString("body", null))
             .setSmallIcon(options.optInt("icon"))
-            .setAutoCancel(true) // Remove the notification from the status bar once tapped.
+            .setAutoCancel(options.optBoolean("autoCancel", true)) // Remove the notification from the status bar once tapped.
             .setNumber(options.optInt("badge"))
             .setColor(options.optInt("color"))
             .setOngoing(options.optBoolean("ongoing"))
-            .setPriority(options.optBoolean("forceShowWhenInForeground") ? 1 : 0)
-            .setTicker(options.optString("ticker", null)); // Let the OS handle the default value for the ticker.
+            .setTicker(options.optString("ticker", null))  // Let the OS handle the default value for the ticker.
+            .setTimeoutAfter(options.optInt("timeout", 0));
 
         final Object thumbnail = options.opt("thumbnail");
 
@@ -83,6 +85,8 @@ public final class Builder {
             builder.setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION));
         }
 
+        applyPriority(options, builder);
+        applyVibratePattern(options, builder);
         applyNotificationLed(options, builder);
         applyStyle(options, builder, context);
         applyTapReceiver(options, builder, context, notificationID);
@@ -94,6 +98,38 @@ public final class Builder {
 
 
     // Notification styles:
+
+
+
+    private static void applyVibratePattern(JSONObject options, NotificationCompat.Builder builder) {
+
+        if (options.has("vibratePattern")) {
+            JSONArray vibratePatternEncoded = options.optJSONArray("vibratePattern");
+            long[] vibratePattern = new long[vibratePatternEncoded.length()];
+
+            for (int i = 0; i < vibratePatternEncoded.length(); ++i) {
+                try {
+                    vibratePattern[i] = ( vibratePatternEncoded.getLong(i) );
+                } catch (JSONException e) {
+                    Log.e(TAG, "Error parsing message at index " + i, e);
+                }
+
+            }
+
+
+            builder.setVibrate(new long[] {100,100,100,100,100,100,100,100});
+        }
+    }
+
+
+    private static void applyPriority(JSONObject options, NotificationCompat.Builder builder) {
+        if (options.has("priority")) {
+            builder.setPriority(options.optInt("priority", 0));
+        } else if (options.has("forceShowWhenInForeground")) {
+            builder.setPriority(options.optBoolean("forceShowWhenInForeground", false) ? 1 : 0);
+            // Not really sure that's a correct interpretation of "priority", but for back-compat...
+        }
+    }
 
     private static void applyNotificationLed(JSONObject options, NotificationCompat.Builder builder) {
         if (shouldEnableNotificationLed(options)) {
