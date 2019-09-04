@@ -25,7 +25,7 @@ public final class Builder {
     public static final String NOTIFICATION_ID = "NOTIFICATION_ID";
 
     private static final String TAG = "Builder";
-    private static final String DEFAULT_CHANNEL = "Notifications";
+    private static final String DEFAULT_CHANNEL = "Miscellaneous";
 
     private static final int DEFAULT_NOTIFICATION_COLOR = Color.parseColor("#ffffffff");
     private static final int DEFAULT_NOTIFICATION_LED_ON = 500;
@@ -39,17 +39,79 @@ public final class Builder {
     }
 
     static Notification build(JSONObject options, Context context, int notificationID, String channelID) {
+
+
+        // Per channel AND per notification, for compatibility with pre-channel Android:
+
+        // Vibration & Pattern
+        boolean hasVibration = false;
+        long[] vibratePattern = null;
+        if (options.has("vibratePattern")) {
+            JSONArray vibratePatternEncoded = options.optJSONArray("vibratePattern");
+
+            hasVibration = true;
+
+            if (vibratePatternEncoded != null) {
+                vibratePattern = new long[vibratePatternEncoded.length()];
+
+                for (int i = 0; i < vibratePatternEncoded.length(); ++i) {
+                    try {
+                        vibratePattern[i] = (vibratePatternEncoded.getLong(i));
+                    } catch (JSONException e) {
+                        Log.e(TAG, "Error parsing vibration duration at index " + i, e);
+                    }
+
+                }
+            }
+        }
+
+
         // Set channel for Android 8+:
 
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             final NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 
+            int finalImportance = NotificationManager.IMPORTANCE_DEFAULT;
+            if (options.has("importance")) {
+                int channelImportance = options.optInt("importance", 0);
+                // New system uses a 0-5 scale
+                switch (channelImportance) { //can't just add 3, apparently - app freezes
+                    case -2: finalImportance = NotificationManager.IMPORTANCE_MIN; break;
+                    case -1: finalImportance = NotificationManager.IMPORTANCE_LOW; break;
+                    case 0:  break;
+                    case 1: finalImportance = NotificationManager.IMPORTANCE_HIGH; break;
+                    case 2: finalImportance = NotificationManager.IMPORTANCE_HIGH; break; // Apparently "MAX" isn't allowed right now
+                }
+
+            } else if (options.has("forceShowWhenInForeground")) {
+                finalImportance = options.optBoolean("forceShowWhenInForeground", false) ? NotificationManager.IMPORTANCE_HIGH : NotificationManager.IMPORTANCE_DEFAULT;
+                // Not really sure that's a correct interpretation of "priority", but for back-compat...
+            }
+
+
+
+            // Attempt to create a new channel every time, because some channel settings CAN be changed after creation:
+            // name, description, group, importance (lower only)
+            // see: https://developer.android.com/reference/android/app/NotificationManager.html#createNotificationChannel(android.app.NotificationChannel)
+            // otherwise it'll ignore this and use existing channel anyway
             if (notificationManager != null && notificationManager.getNotificationChannel(channelID) == null) {
-                NotificationChannel channel = new NotificationChannel(channelID, channelID, NotificationManager.IMPORTANCE_HIGH);
-                if (shouldEnableNotificationLed(options)) {
+                NotificationChannel channel = new NotificationChannel(channelID, channelID, finalImportance);
+                if (options.has("notificationLed")) {
                     channel.enableLights(true);
                     channel.setLightColor(getLedColor(options));
                 }
+
+                channel.enableVibration(hasVibration);
+
+                if (vibratePattern != null) {
+                    channel.setVibrationPattern(vibratePattern);
+                }
+
+                if (options.has("channelDescription")) {
+                    channel.setDescription(options.optString("channelDescription", ""));
+                }
+
+
                 notificationManager.createNotificationChannel(channel);
             }
         }
@@ -71,7 +133,9 @@ public final class Builder {
             .setColor(options.optInt("color"))
             .setOngoing(options.optBoolean("ongoing"))
             .setTicker(options.optString("ticker", null))  // Let the OS handle the default value for the ticker.
-            .setTimeoutAfter(options.optInt("timeout", 0));
+            .setTimeoutAfter(options.optInt("expiresAfter", 0)) // Zero seems to work as "none"
+            .setVibrate(vibratePattern) // for pre-Channels Android
+            .setPriority(options.optInt("importance", 0)); //for pre-Channels Android
 
         final Object thumbnail = options.opt("thumbnail");
 
@@ -80,13 +144,13 @@ public final class Builder {
         }
 
         // TODO sound preference is not doing anything
-        // builder.setSound(options.has("sound") ? Uri.parse("android.resource://" + context.getPackageName() + "/raw/" + options.getString("sound")) : Uri.parse("android.resource://" + context.getPackageName() + "/raw/notify"))
+        // builder.setSound(options.has("sound") ? Uri.parse("android.resource://" + context.getPackageName() + "%s/raw/%s" + options.getString("sound")) : Uri.parse("android.resource://" + context.getPackageName() + "/raw/notify"))
         if (options.has("sound")) {
             builder.setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION));
         }
 
-        applyPriority(options, builder);
-        applyVibratePattern(options, builder);
+        applyImportance(options, builder);
+        applyProgressBar(options, builder);
         applyNotificationLed(options, builder);
         applyStyle(options, builder, context);
         applyTapReceiver(options, builder, context, notificationID);
@@ -101,39 +165,29 @@ public final class Builder {
 
 
 
-    private static void applyVibratePattern(JSONObject options, NotificationCompat.Builder builder) {
-
-        if (options.has("vibratePattern")) {
-            JSONArray vibratePatternEncoded = options.optJSONArray("vibratePattern");
-            long[] vibratePattern = new long[vibratePatternEncoded.length()];
-
-            for (int i = 0; i < vibratePatternEncoded.length(); ++i) {
-                try {
-                    vibratePattern[i] = ( vibratePatternEncoded.getLong(i) );
-                } catch (JSONException e) {
-                    Log.e(TAG, "Error parsing message at index " + i, e);
-                }
-
-            }
-
-
-            builder.setVibrate(new long[] {100,100,100,100,100,100,100,100});
-        }
-    }
-
-
-    private static void applyPriority(JSONObject options, NotificationCompat.Builder builder) {
-        if (options.has("priority")) {
-            builder.setPriority(options.optInt("priority", 0));
+    private static void applyImportance(JSONObject options, NotificationCompat.Builder builder) {
+        if (options.has("importance")) {
+            builder.setPriority(options.optInt("importance", 0));
         } else if (options.has("forceShowWhenInForeground")) {
             builder.setPriority(options.optBoolean("forceShowWhenInForeground", false) ? 1 : 0);
             // Not really sure that's a correct interpretation of "priority", but for back-compat...
         }
     }
 
+    private static void applyProgressBar(JSONObject options, NotificationCompat.Builder builder) {
+        if (options.has("progress")) {
+            if (options.has("progressMax")) {
+                builder.setProgress(options.optInt("progressMax", 100), options.optInt("progress", 0), false);
+            } else {
+                builder.setProgress(0, 100, true);
+            }
+        }
+    }
+
+
     private static void applyNotificationLed(JSONObject options, NotificationCompat.Builder builder) {
-        if (shouldEnableNotificationLed(options)) {
-            builder.setLights(getLedColor(options), DEFAULT_NOTIFICATION_LED_ON, DEFAULT_NOTIFICATION_LED_OFF);
+        if (options.has("notificationLed")) {
+            builder.setLights(getLedColor(options), options.optInt("ledOn", 100), options.optInt("ledOff", 100));
         }
     }
 
@@ -320,15 +374,12 @@ public final class Builder {
         return null;
     }
 
-    private static boolean shouldEnableNotificationLed(JSONObject options) {
-        return options.has("notificationLed");
-    }
 
     private static int getLedColor(JSONObject options) {
         Object notificationLed = options.opt("notificationLed");
 
         if (Boolean.TRUE.equals(notificationLed)) {
-            return DEFAULT_NOTIFICATION_COLOR;
+            return options.optInt("color", DEFAULT_NOTIFICATION_COLOR);  //Use foreground color for LED for consistency
         } else if (notificationLed instanceof Integer) {
             return (int) notificationLed;
         } else {
