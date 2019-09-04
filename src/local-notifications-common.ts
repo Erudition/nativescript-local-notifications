@@ -72,6 +72,12 @@ export interface ScheduleOptions {
   trigger?: "timeInterval";
 
   /**
+   * Whether tapping the notification automatically dismisses it.
+   Default true.
+   */
+  autoCancel?: boolean;
+
+  /**
    * On iOS (and some Android devices) you see a number on top of the app icon. On most Android devices you'll see this number in the notification center.
    * Default not set (0).
    */
@@ -180,19 +186,48 @@ export interface ScheduleOptions {
   channel?: string;
 
   /**
+   * Sets the user visible description of this channel. Explain why this user might want to keep this channel enabled.
+
+   The recommended maximum length is 300 characters; the value may be truncated if it is too long.
+   */
+  channelDescription?: string;
+
+  /**
    * Default false.
    */
   forceShowWhenInForeground?: boolean;
 
   /**
-   * Default false.
+   * Sets the priority of a notification on Android. Default: 0.
+
+   0: Default notification importance: shows everywhere, makes noise, but does not visually intrude.
+   1: Higher notification importance: shows everywhere, makes noise and peeks. May use full screen intents.
+   2: Unused
+   -1: Low notification importance: Shows in the shade, and potentially in the status bar (see shouldHideSilentStatusBarIcons()), but is not audibly intrusive.
+   -2: Min notification importance: only shows in the shade, below the fold.
    */
-  priority?: number;
+  importance?: number;
 
   /**
    * Buttons or text input.
    */
   actions?: Array<NotificationAction>;
+
+  /**
+   * The lifetime of this notification in milliseconds. The notification will kindly remove itself after this duration has passed. Default: forever. However, most notifications have a reasonable "expiration" point at which they've outlived their relevance, so setting this can help keep users' notification drawers tidy.
+   */
+  expiresAfter?: number;
+
+
+    /**
+     * Set this value to an *integer* to show a progress bar on the notification - typically to indicate the progress of a background operation. Default: not set (no progress bar).
+     */
+    progress?: number;
+
+    /**
+     * Set this value to an *integer* that represents the maximum (final) value of the progress indicated by `progress`. Has no effect if `progress` is not set. If `progress` is set but `progressMax` is omitted, the progress will be assumed to be "indeterminate". Default: 100.
+     */
+    progressMax?: number;
 }
 
 export interface ReceivedNotification {
