@@ -49,10 +49,10 @@ export class HelloWorldModel extends Observable {
         sound: "customsound",
         color: new Color("green"),
         forceShowWhenInForeground: true,
-        channel: "My Awesome Channel", // not that this is revealed in the notification tray when you longpress it on Android
+        channel: "My Awesome Channel",
         ticker: "Special ticker text (Android only)",
         at: new Date(new Date().getTime() + (10 * 1000)),
-        notificationLed: true,
+        notificationLed: new Color("green"),
         actions: [
           {
             id: "yes",
@@ -70,7 +70,8 @@ export class HelloWorldModel extends Observable {
       },
       {
         title: 'Generated ID',
-        at: new Date(new Date().getTime() + (5 * 1000))
+        at: new Date(new Date().getTime() + (5 * 1000)),
+        timeout: 5000
       }
     ];
     LocalNotifications.schedule(options)
@@ -92,11 +93,16 @@ export class HelloWorldModel extends Observable {
           subtitle: "Remember this game?",
           icon: 'res://ic_stat_notify',
           color: new Color("red"),
+          notificationLed: new Color("red"),
           image: "https://images-na.ssl-images-amazon.com/images/I/61mx-VbrS0L.jpg",
           thumbnail: "https://2.bp.blogspot.com/-H_SZ3nAmNsI/VrJeARpbuSI/AAAAAAAABfc/szsV7_F609k/s200/emoji.jpg",
           forceShowWhenInForeground: false, // default
           body: "RTS FTW!",
           sound: null,
+          channel: "Vibrate Channel",
+          channelDescription: "The channel with vibration enabled!",
+          vibratePattern: [150,300,100,100,100,50,500,1000],
+          importance: 1,
           at: new Date(new Date().getTime() + 10 * 1000)
         }])
         .then(() => {
@@ -119,7 +125,8 @@ export class HelloWorldModel extends Observable {
           thumbnail: true,
           // body: 'You should see a \'3\' somewhere',
           at: new Date(new Date().getTime() + 10 * 1000),
-          badge: 3
+          badge: 3,
+          progress: 0
         }])
         .then(() => {
           alert({
@@ -195,7 +202,9 @@ export class HelloWorldModel extends Observable {
           icon: 'res://ic_stat_smiley',
           thumbnail: "res://ic_stat_notify",
           forceShowWhenInForeground: true,
-          at: new Date(new Date().getTime() + 10 * 1000)
+          at: new Date(new Date().getTime() + 10 * 1000),
+          progress: 467,
+          progressMax: 1000
         }])
         .then(() => {
           alert({
